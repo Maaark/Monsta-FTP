@@ -1,6 +1,6 @@
 <?php
 
-$version = "1.5.3";
+$version = "1.5.4";
 
 require("config.php");
 
@@ -4074,5 +4074,3 @@ function sanitizeStr($str)
     
     return $str;
 }
-
-?>
