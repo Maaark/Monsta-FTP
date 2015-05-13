@@ -1,6 +1,6 @@
 <?php
 
-$version = "1.5.2";
+$version = "1.5.3";
 
 require("config.php");
 
@@ -18,7 +18,7 @@ $langFileArray = getFileArray("languages");
 if (in_array($_SESSION["lang"], $langFileArray))
     include("languages/" . $_SESSION["lang"] . ".php");
 else
-    include("languages/en_us.php");
+    include("languages/".$defaultLang.".php");
 
 # SET VARS
 
@@ -185,8 +185,17 @@ function startSession()
 
 function saveFtpDetailsCookie()
 {
+	global $allowedHosts;
+	global $hostCheck;
     
     if ($_POST["login"] == 1) {
+        
+        if($hostCheck === true)
+        {
+	        if(!in_array($_POST['ftp_host'], $allowedHosts))
+			die('HOST NOT ALLOWED');
+        }
+        
         
         if ($_POST["login_save"] == 1) {
             
@@ -319,6 +328,7 @@ function displayHeader()
 {
     
     global $version;
+    global $title;
     
     // The order of these determines the proper display
     if ($_COOKIE["skin"] != "")
@@ -334,10 +344,9 @@ function displayHeader()
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html>
 <head>
-    <title>Monsta FTP v<?php
-    echo $version;
-?></title>
+    <title><?php echo $title; ?></title>
     <link href="style.css" rel="stylesheet" type="text/css">
+    <link href="custom.css" rel="stylesheet" type="text/css">
     <link href="skins/<?php
     echo sanitizeStr($skin);
 ?>.css" rel="stylesheet" type="text/css">
@@ -364,8 +373,17 @@ function displayLoginForm($posted)
 {
     
     global $version;
+    global $showVersion;
+    global $title;
+    global $hostInputVisible;
+    global $hostSelectable;
+    global $showLogo;
+    global $logo;
     global $ftpHost;
+    global $ftp_host;
+    global $ftp_user;
     global $ajaxRequest;
+    global $skinSelect;
     global $lang_max_logins;
     global $lang_btn_login;
     global $lang_ftp_host;
@@ -444,13 +462,16 @@ function displayLoginForm($posted)
         } else {
             $height = 458;
         }
+        
 ?>
 
-<form method="post" action="?">
+<form method="post" action="?ftp_host=<?php echo $ftp_host;?>&ftp_user=<?php echo $ftp_user;?>">
 
 <div align="center">
     <div id="loginForm" align="left">
-        <div id="loginFormTitle">Monsta FTP</div>
+	    <?php
+		  echo '<div id="loginFormTitle">'.($showLogo === true ? '<img src="'.$logo.'">' : $title).'</div>';
+		 ?>
             <div id="loginFormContent">
 
 <?php
@@ -470,30 +491,20 @@ function displayLoginForm($posted)
         echo $_GET["openFolder"];
 ?>">
 
-<?php
-        if ($ftpHost == "") {
-?>
-<?php
-            echo $lang_ftp_host;
-?>:
-<br><input type="text" name="ftp_host" value="<?php
+<div <?php if($hostSelectable === false) echo 'style="display: none;"';?>>
+<?php if ($ftpHost == "") { ?>
+<?php echo $lang_ftp_host; ?>:
+<br>
+<input type="text" name="ftp_host" value="<?php
             echo sanitizeStr($ftp_host);
 ?>" size="30" class="<?php
             if ($posted == 1 && $ftp_host == "")
                 echo "bgFormError";
-?>"> 
-<?php
-            echo $lang_port;
-?>: <input type="text" name="ftp_port" value="<?php
-            echo sanitizeStr($ftp_port);
-?>" size="3" class="<?php
-            if ($posted == 1 && $ftp_port == "")
-                echo "bgFormError";
-?>" tabindex="-1"> 
+?>"> <?php echo $lang_port; ?>: <input type="text" name="ftp_port" value="<?php echo sanitizeStr($ftp_port) ?>" size="3" class="<?php if ($posted==1 && $ftp_port=="") echo "bgFormError"; ?>" tabindex="-1"> 
 <p>
-<?php
-        }
-?>
+<?php } ?>
+</div>
+
 
 <?php
         echo $lang_username;
@@ -524,11 +535,11 @@ function displayLoginForm($posted)
 <?php
 if ($versionCheck == 1) {
 ?>
-<iframe src="http://www.monstaftp.com/vc.php?v=<?php
+<iframe src="<?php echo (!isset($_SERVER['HTTPS']) || $_SERVER['HTTPS'] != 'on' ? 'http' : 'https');?>://www.monstaftp.com/vc.php?v=<?php
 	echo $version;
 ?>" width="200" height="20" scrolling="no" frameborder="0"></iframe>
 <?php
-} else {
+} else if ($showVersion === true){
 ?>
 <a href="http://www.monstaftp.com">version <?php
 	echo $version;
@@ -586,11 +597,14 @@ if ($versionCheck == 1) {
         echo displayLangSelect($_SESSION["lang"]);
 ?>
 <?php
+		if($skinSelect === true)
         echo displaySkinSelect($skin);
-?>
+        
+		if($showVersion === true):
+	?>
 
 <p><hr noshade>
-
+	
     <div>
         <div class="floatLeft">v. <?php
             echo $version;
@@ -599,10 +613,14 @@ if ($versionCheck == 1) {
         <a href="http://www.monstaftp.com/donations.php">Make a Donation</a>
         </div>
     </div>
+   
     <br>
         </div>
     </div>
 </div>
+<?php
+	endif;
+?>
 
 </form>
 
@@ -3792,7 +3810,7 @@ function loadJsLangVars()
     if (in_array($_SESSION["lang"], $langFileArray))
         include("languages/" . $_SESSION["lang"] . ".php");
     else
-        include("languages/en_us.php");
+        include("languages/".$defaultLang.".php");
 ?>
 <script type="text/javascript">
 var lang_no_xmlhttp = '<?php
@@ -3880,6 +3898,7 @@ var upload_limit = '<?php
 
 function setLangFile()
 {
+    global $defaultLang;
     
     // The order of these determines the proper display
     if ($_COOKIE["lang"] != "")
@@ -3891,22 +3910,27 @@ function setLangFile()
     
     if ($lang == "") {
         
-        $dir = "languages";
-        
-        if (is_dir($dir)) {
-            if ($dh = opendir($dir)) {
-                while (($file = readdir($dh)) !== false) {
-                    if ($file != "." && $file != ".." && $file != "index.html") {
-                        
-                        include("languages/" . $file);
-                        
-                        if ($file_lang_default == 1)
-                            $lang = str_replace(".php", "", $file);
-                    }
-                }
-                closedir($dh);
-            }
-        }
+        if(!empty($defaultLang))
+        $lang = $defaultLang;
+        else
+        {
+	        $dir = "languages";
+	        
+	        if (is_dir($dir)) {
+	            if ($dh = opendir($dir)) {
+	                while (($file = readdir($dh)) !== false) {
+	                    if ($file != "." && $file != ".." && $file != "index.html") {
+	                        
+	                        include("languages/" . $file);
+	                        
+	                        if ($file_lang_default == 1)
+	                            $lang = str_replace(".php", "", $file);
+	                    }
+	                }
+	                closedir($dh);
+	            }
+	        }
+	    }
     }
     
     $_SESSION["lang"] = $lang;
@@ -3917,6 +3941,8 @@ function sessionExpired($message)
     
     global $lang_title_ended;
     global $lang_btn_login;
+    global $ftp_host;
+    global $ftp_user;
     
     $title = $lang_title_ended;
     
@@ -3924,7 +3950,7 @@ function sessionExpired($message)
     
     echo $message;
     
-    echo "<p><input type=\"button\" id=\"btnLogin\" value=\"" . $lang_btn_login . "\" onClick=\"document.location.href='?openFolder=" . $_POST["openFolder"] . "'\">";
+    echo "<p><input type=\"button\" id=\"btnLogin\" value=\"" . $lang_btn_login . "\" onClick=\"document.location.href='?openFolder=" . $_POST["openFolder"] . "&ftp_host=".$ftp_host."&ftp_user=".$ftp_user."\">";
     
     displayPopupClose(1, "", 0);
 }
